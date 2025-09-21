@@ -19,7 +19,8 @@ export default async function handler(req, res) {
       broker_name, 
       account_balance, 
       ea_version, 
-      mt5_build 
+      mt5_build,
+      trial_type = 'trial_30' // Default 30-day, can be 'trial_7' or 'trial_30'
     } = req.body;
     
     if (!account_number || !broker_name) {
@@ -51,7 +52,7 @@ export default async function handler(req, res) {
       if (expiryDate < now) {
         return res.json({
           valid: false,
-          message: 'Trial period expired',
+          message: 'Trial period expired - Contact Mark8Pips to upgrade',
           status: 'expired',
           expires_at: existingUser.expires_at
         });
@@ -60,7 +61,7 @@ export default async function handler(req, res) {
       if (existingUser.status !== 'active' && existingUser.status !== 'trial') {
         return res.json({
           valid: false,
-          message: 'License suspended',
+          message: 'License suspended - Contact Mark8Pips support',
           status: existingUser.status
         });
       }
@@ -74,9 +75,10 @@ export default async function handler(req, res) {
         message: `Welcome back! ${existingUser.subscription_type} license active`
       });
     } else {
-      // Create new user with 30-day trial
+      // Create new user with configurable trial period
       const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + 30);
+      const trialDays = trial_type === 'trial_7' ? 7 : 30;
+      expiryDate.setDate(expiryDate.getDate() + trialDays);
       
       const { data: newUser } = await supabase
         .from('users')
@@ -86,7 +88,7 @@ export default async function handler(req, res) {
           account_balance,
           ea_version,
           mt5_build,
-          subscription_type: 'trial',
+          subscription_type: trial_type,
           status: 'trial',
           expires_at: expiryDate.toISOString(),
           validation_count: 1
@@ -103,17 +105,17 @@ export default async function handler(req, res) {
         .insert({
           user_id: newUser.id,
           license_key,
-          ea_name: 'Professional EA'
+          ea_name: 'Mark8Pips Professional EA'
         });
       
       return res.json({
         valid: true,
         status: 'trial',
-        subscription_type: 'trial',
+        subscription_type: trial_type,
         expires_at: expiryDate.toISOString(),
-        days_remaining: 30,
+        days_remaining: trialDays,
         license_key,
-        message: 'Welcome! 30-day trial activated'
+        message: `Welcome! ${trialDays}-day trial activated`
       });
     }
     
