@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     const { email, password } = req.body;
     
     // Simple hardcoded admin check (replace with proper password hashing)
-    if (email === 'admin@mark8pips.com' && password === 'YourSecurePassword123!') {
+    if (email === 'rangooniarman@gmail.com' && password === 'Sam@00977') {
       
       // Generate JWT token
       const token = jwt.sign(
