@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   
   try {
     if (req.method === 'GET') {
-      // Get dashboard statistics with more details
+      // Get dashboard statistics with enhanced details
       const { data: users } = await supabase
         .from('users')
         .select('*')
@@ -74,7 +74,7 @@ export default async function handler(req, res) {
     }
     
     if (req.method === 'POST') {
-      const { action, account_number, subscription_type, months, days, trial_type } = req.body;
+      const { action, account_number, subscription_type, months, days } = req.body;
       
       if (action === 'upgrade') {
         // Upgrade user subscription
@@ -110,31 +110,49 @@ export default async function handler(req, res) {
           })
           .eq('account_number', account_number);
         
-        res.json({ success: true, message: `User upgraded to ${subscription_type}`, new_expires_at: newExpiry.toISOString() });
+        // Log admin activity
+        await supabase
+          .from('admin_activity')
+          .insert({
+            admin_email: user.email,
+            action: 'upgrade_user',
+            target_account: account_number,
+            details: { new_plan: subscription_type, expires_at: newExpiry.toISOString() }
+          });
+        
+        res.json({ 
+          success: true, 
+          message: `User upgraded to ${subscription_type} plan successfully!`,
+          new_expires_at: newExpiry.toISOString() 
+        });
       }
       
       if (action === 'extend') {
         // Get current user data
-        const { data: user } = await supabase
+        const { data: userToExtend } = await supabase
           .from('users')
           .select('expires_at')
           .eq('account_number', account_number)
           .single();
         
-        if (!user) {
+        if (!userToExtend) {
           return res.status(404).json({ success: false, message: 'User not found' });
         }
         
-        // Extend from current expiry date (not from now)
-        const currentExpiry = new Date(user.expires_at);
+        // Extend from current expiry date OR from now if expired
+        const currentExpiry = new Date(userToExtend.expires_at);
+        const now = new Date();
+        const baseDate = currentExpiry > now ? currentExpiry : now;
         let newExpiry;
         
         if (days) {
-          newExpiry = new Date(currentExpiry.setDate(currentExpiry.getDate() + parseInt(days)));
+          newExpiry = new Date(baseDate);
+          newExpiry.setDate(baseDate.getDate() + parseInt(days));
         } else if (months) {
-          newExpiry = new Date(currentExpiry.setMonth(currentExpiry.getMonth() + parseInt(months)));
+          newExpiry = new Date(baseDate);
+          newExpiry.setMonth(baseDate.getMonth() + parseInt(months));
         } else {
-          return res.status(400).json({ success: false, message: 'Please specify days or months' });
+          return res.status(400).json({ success: false, message: 'Please specify days or months to extend' });
         }
         
         await supabase
@@ -145,4 +163,65 @@ export default async function handler(req, res) {
           })
           .eq('account_number', account_number);
         
-        const extensionText = days ? `${days} days
+        // Log admin activity
+        const extensionText = days ? `${days} days` : `${months} months`;
+        await supabase
+          .from('admin_activity')
+          .insert({
+            admin_email: user.email,
+            action: 'extend_license',
+            target_account: account_number,
+            details: { extension: extensionText, new_expires_at: newExpiry.toISOString() }
+          });
+        
+        res.json({ 
+          success: true, 
+          message: `License extended by ${extensionText} successfully!`,
+          new_expires_at: newExpiry.toISOString()
+        });
+      }
+      
+      if (action === 'suspend') {
+        await supabase
+          .from('users')
+          .update({ status: 'suspended' })
+          .eq('account_number', account_number);
+        
+        // Log admin activity
+        await supabase
+          .from('admin_activity')
+          .insert({
+            admin_email: user.email,
+            action: 'suspend_user',
+            target_account: account_number,
+            details: { reason: 'Manual suspension by admin' }
+          });
+        
+        res.json({ success: true, message: 'User suspended successfully' });
+      }
+      
+      if (action === 'reactivate') {
+        await supabase
+          .from('users')
+          .update({ status: 'active' })
+          .eq('account_number', account_number);
+        
+        // Log admin activity
+        await supabase
+          .from('admin_activity')
+          .insert({
+            admin_email: user.email,
+            action: 'reactivate_user',
+            target_account: account_number,
+            details: { reason: 'Reactivated by admin' }
+          });
+        
+        res.json({ success: true, message: 'User reactivated successfully' });
+      }
+    }
+    
+  } catch (error) {
+    console.error('Dashboard API error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
