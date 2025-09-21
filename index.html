@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MT5 EA License Manager</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { background: #2c3e50; color: white; padding: 1rem 0; text-align: center; margin-bottom: 2rem; }
+        .card { background: white; padding: 2rem; margin-bottom: 2rem; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
+        input, select, textarea { width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; }
+        button { background: #3498db; color: white; padding: 0.8rem 1.5rem; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; margin-right: 0.5rem; margin-top: 0.5rem; }
+        button:hover { background: #2980b9; }
+        .success { background: #2ecc71; color: white; padding: 1rem; border-radius: 4px; margin-bottom: 1rem; }
+        .error { background: #e74c3c; color: white; padding: 1rem; border-radius: 4px; margin-bottom: 1rem; }
+        .license-result { background: #f8f9fa; border: 1px solid #dee2e6; padding: 1rem; border-radius: 4px; margin-top: 1rem; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏆 MT5 EA License Manager</h1>
+        <p>Manage your Expert Advisor licenses and subscriptions</p>
+    </div>
+
+    <div class="container">
+        <div class="grid">
+            <!-- Create License Section -->
+            <div class="card">
+                <h2>🆕 Create New License</h2>
+                <form id="createLicenseForm">
+                    <div class="form-group">
+                        <label for="userEmail">User Email</label>
+                        <input type="email" id="userEmail" required placeholder="customer@example.com">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="eaName">Expert Advisor Name</label>
+                        <input type="text" id="eaName" required placeholder="MyAwesomeEA">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="accountNumbers">MT5 Account Numbers (comma separated)</label>
+                        <input type="text" id="accountNumbers" required placeholder="12345, 67890, 11111">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="subscriptionType">Subscription Type</label>
+                        <select id="subscriptionType" required>
+                            <option value="monthly">Monthly ($29/month)</option>
+                            <option value="yearly">Yearly ($290/year)</option>
+                            <option value="lifetime">Lifetime ($999 one-time)</option>
+                        </select>
+                    </div>
+                    
+                    <button type="submit">Create License</button>
+                </form>
+                
+                <div id="createResult"></div>
+            </div>
+
+            <!-- Admin Actions Section -->
+            <div class="card">
+                <h2>⚙️ License Management</h2>
+                
+                <div class="form-group">
+                    <label for="licenseKey">License Key</label>
+                    <input type="text" id="licenseKey" placeholder="EA-1234567890-ABCDEF">
+                </div>
+                
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button onclick="getLicenseInfo()">📋 Get Info</button>
+                    <button onclick="extendLicense()">⏰ Extend</button>
+                    <button onclick="revokeLicense()">❌ Revoke</button>
+                </div>
+                
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label for="extendMonths">Months to Extend</label>
+                    <input type="number" id="extendMonths" min="1" value="1">
+                </div>
+                
+                <div id="adminResult"></div>
+            </div>
+        </div>
+
+        <!-- Test License Section -->
+        <div class="card">
+            <h2>🧪 Test License Validation</h2>
+            <p>Test your license validation endpoint (same endpoint your MT5 EA will use)</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label for="testLicenseKey">License Key</label>
+                    <input type="text" id="testLicenseKey" placeholder="EA-1234567890-ABCDEF">
+                </div>
+                
+                <div class="form-group">
+                    <label for="testAccountNumber">Account Number</label>
+                    <input type="number" id="testAccountNumber" placeholder="12345">
+                </div>
+            </div>
+            
+            <button onclick="testValidation()">🔍 Test Validation</button>
+            <div id="testResult"></div>
+        </div>
+    </div>
+
+    <script>
+        // Will be set to your Vercel deployment URL after deployment
+        const API_BASE = window.location.origin;
+        
+        // Create License
+        document.getElementById('createLicenseForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('userEmail').value;
+            const eaName = document.getElementById('eaName').value;
+            const accountNumbers = document.getElementById('accountNumbers').value.split(',').map(num => num.trim());
+            const subscriptionType = document.getElementById('subscriptionType').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/create-license`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_email: email,
+                        ea_name: eaName,
+                        account_numbers: accountNumbers,
+                        subscription_type: subscriptionType
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('createResult').innerHTML = `
+                        <div class="success">
+                            <h4>✅ License Created Successfully!</h4>
+                            <div class="license-result">
+                                <p><strong>License Key:</strong> <code>${result.license_key}</code></p>
+                                <p><strong>Expires:</strong> ${new Date(result.expires_at).toLocaleDateString()}</p>
+                                <p><strong>User ID:</strong> ${result.user_id}</p>
+                                <p><em>Send the License Key to your customer</em></p>
+                            </div>
+                        </div>
+                    `;
+                    document.getElementById('createLicenseForm').reset();
+                } else {
+                    document.getElementById('createResult').innerHTML = `
+                        <div class="error">❌ Error: ${result.message}</div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('createResult').innerHTML = `
+                    <div class="error">❌ Network Error: ${error.message}</div>
+                `;
+            }
+        });
+
+        // Get License Info
+        async function getLicenseInfo() {
+            const licenseKey = document.getElementById('licenseKey').value;
+            if (!licenseKey) {
+                alert('Please enter a license key');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/${licenseKey}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    const license = result.license;
+                    const user = license.user;
+                    
+                    document.getElementById('adminResult').innerHTML = `
+                        <div class="success">
+                            <h4>📋 License Information</h4>
+                            <div class="license-result">
+                                <p><strong>EA Name:</strong> ${license.ea_name}</p>
+                                <p><strong>User Email:</strong> ${user.email}</p>
+                                <p><strong>Account Numbers:</strong> ${license.account_numbers.join(', ')}</p>
+                                <p><strong>Subscription:</strong> ${user.subscription_type}</p>
+                                <p><strong>Status:</strong> ${user.status}</p>
+                                <p><strong>Expires:</strong> ${new Date(user.expires_at).toLocaleDateString()}</p>
+                                <p><strong>Validations:</strong> ${license.validation_count || 0}</p>
+                                <p><strong>Last Validation:</strong> ${license.last_validation ? new Date(license.last_validation).toLocaleString() : 'Never'}</p>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('adminResult').innerHTML = `
+                        <div class="error">❌ ${result.message}</div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('adminResult').innerHTML = `
+                    <div class="error">❌ Network Error: ${error.message}</div>
+                `;
+            }
+        }
+
+        // Extend License
+        async function extendLicense() {
+            const licenseKey = document.getElementById('licenseKey').value;
+            const months = document.getElementById('extendMonths').value;
+            
+            if (!licenseKey || !months) {
+                alert('Please enter license key and months to extend');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/extend-license`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ license_key: licenseKey, months: months })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('adminResult').innerHTML = `
+                        <div class="success">
+                            ✅ License extended successfully!<br>
+                            New expiration: ${new Date(result.new_expires_at).toLocaleDateString()}
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('adminResult').innerHTML = `
+                        <div class="error">❌ ${result.message}</div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('adminResult').innerHTML = `
+                    <div class="error">❌ Network Error: ${error.message}</div>
+                `;
+            }
+        }
+
+        // Revoke License
+        async function revokeLicense() {
+            const licenseKey = document.getElementById('licenseKey').value;
+            if (!licenseKey) {
+                alert('Please enter a license key');
+                return;
+            }
+            
+            if (!confirm('Are you sure you want to revoke this license? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/revoke-license`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ license_key: licenseKey })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('adminResult').innerHTML = `
+                        <div class="success">✅ ${result.message}</div>
+                    `;
+                } else {
+                    document.getElementById('adminResult').innerHTML = `
+                        <div class="error">❌ ${result.message}</div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('adminResult').innerHTML = `
+                    <div class="error">❌ Network Error: ${error.message}</div>
+                `;
+            }
+        }
+
+        // Test License Validation
+        async function testValidation() {
+            const licenseKey = document.getElementById('testLicenseKey').value;
+            const accountNumber = document.getElementById('testAccountNumber').value;
+            
+            if (!licenseKey || !accountNumber) {
+                alert('Please enter both license key and account number');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/validate-license`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        license_key: licenseKey, 
+                        account_number: accountNumber 
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.valid) {
+                    document.getElementById('testResult').innerHTML = `
+                        <div class="success">
+                            <h4>✅ License Valid!</h4>
+                            <div class="license-result">
+                                <p><strong>EA Name:</strong> ${result.ea_name}</p>
+                                <p><strong>Expires:</strong> ${new Date(result.expires_at).toLocaleDateString()}</p>
+                                <p><strong>Days Remaining:</strong> ${result.days_remaining} days</p>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('testResult').innerHTML = `
+                        <div class="error">❌ License Invalid: ${result.message}</div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('testResult').innerHTML = `
+                    <div class="error">❌ Network Error: ${error.message}</div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
